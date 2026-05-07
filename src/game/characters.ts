@@ -26,7 +26,14 @@ export interface CharacterDef {
   blurb: string;          // 1-line flavor for the select screen
   startingWeapon: WeaponKind;
   stats: CharacterStats;
-  build: () => THREE.Group;
+  // Either `assetId` (GLB-backed) OR `build` (procedural). Migration is
+  // per-character; both forms coexist until all three heroes are converted.
+  assetId?: 'sir_pommelry' | 'mistress_quill' | 'margate_tossworthy';
+  build?: () => THREE.Group;
+  // Per-character animation metadata, only meaningful for GLB-backed defs.
+  attackStrikeFrame?: number;   // 0-indexed frame within Attack clip
+  attackTotalFrames?: number;
+  height?: number;              // metres, for camera framing & damage anchor
 }
 
 const flat = (color: number, rough = 0.6) =>
@@ -302,9 +309,12 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
     name: 'Sir Pommelry',
     title: 'Knight, Probationary',
     blurb: 'Inherited a sword and a chronic sense of duty from an aunt. Has been meaning to put both down for some years now. Stands in the middle of trouble and lets it spin past him, which is, technically, a kind of strategy.',
-    startingWeapon: 'blades',
+    startingWeapon: 'blades',  // becomes 'swordswing' in Phase C
     stats: { maxHp: 130, moveSpeed: 5.4, magnetRadius: 2.0, damageMult: 1.0, cooldownMult: 1.0 },
-    build: buildKnight,
+    assetId: 'sir_pommelry',
+    attackStrikeFrame: 12,
+    attackTotalFrames: 22,
+    height: 1.36,
   },
   sorceress: {
     id: 'sorceress',
