@@ -186,6 +186,13 @@ export class AssetCache {
     return { scene, clips: src.clips };
   }
 }
+
+/**
+ * Process-wide singleton. Lives here (not in main.ts) so domain modules
+ * (Player, EnemyManager) can import it without creating a circular
+ * dependency back through main.ts.
+ */
+export const assets = new AssetCache();
 ```
 
 - [ ] **Step 4: Run the test, expect pass.**
@@ -341,20 +348,18 @@ git commit -m "Add AnimatedCharacter with Idle/Run state machine"
 
 Open `src/main.ts`. Near the top imports, add:
 ```typescript
-import { AssetCache } from './engine/assets';
+import { assets } from './engine/assets';
 ```
+(Note: `assets` is the singleton exported by `assets.ts`, not a fresh instance. This avoids a circular import — domain modules like `Player` and `EnemyManager` import it from `engine/assets`, never from `main`.)
 
 Find the line `let selectedCharacter: CharacterDef = CHARACTERS.knight;` (around line 150) and ABOVE the existing `hud.hide(); title.show();` block, add:
 
 ```typescript
-const assets = new AssetCache();
 // Preload character GLBs while the title sits on screen. We disable the Play
 // button until preload resolves — title/select fall through gracefully on a
 // fast machine because the promise resolves before the user clicks.
-let assetsReady = false;
 title.setPlayEnabled(false);
 assets.preloadAll().then(() => {
-  assetsReady = true;
   title.setPlayEnabled(true);
 }).catch(err => {
   console.error('Asset preload failed', err);
@@ -378,14 +383,7 @@ setPlayEnabled(enabled: boolean) {
 
 If the existing play button doesn't have class `play`, add `class="play"` to it in the title screen template.
 
-- [ ] **Step 3: Export `assets` so other modules can read it.**
-
-In `src/main.ts`, just after creating the `AssetCache`, also add:
-```typescript
-export { assets };
-```
-
-- [ ] **Step 4: Verify in browser.**
+- [ ] **Step 3: Verify in browser.**
 
 Run:
 ```
@@ -393,7 +391,7 @@ npm run dev
 ```
 Open `http://localhost:5173`. Title should show "Loading…" briefly then become "Play". DevTools Network tab should show six `.glb` requests, all 200 OK. No console errors. Stop server.
 
-- [ ] **Step 5: Commit.**
+- [ ] **Step 4: Commit.**
 
 ```
 git add src/main.ts src/ui/screens.ts
@@ -473,7 +471,7 @@ import type { PlayerStats } from './types';
 import type { CharacterDef } from './characters';
 import type { Torch } from './torch';
 import { AnimatedCharacter } from './animated-character';
-import { assets } from '../main';
+import { assets } from '../engine/assets';
 
 const TURN_LERP = 14;
 
@@ -1392,7 +1390,7 @@ This is the largest single edit in the plan because `enemies.ts` is one tightly-
 Near the top of `enemies.ts`, alongside `ENEMY_TYPES`:
 ```typescript
 import { AnimatedCharacter, type AnimMeta } from './animated-character';
-import { assets } from '../main';
+import { assets } from '../engine/assets';
 
 const ENEMY_ASSETS: Record<EnemyKind, { id: 'runner' | 'brute' | 'boss'; meta: AnimMeta }> = {
   runner: { id: 'runner', meta: { strikeFrame: 11, attackTotalFrames: 22 } },
