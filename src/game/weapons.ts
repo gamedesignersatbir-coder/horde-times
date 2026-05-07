@@ -107,7 +107,7 @@ export class WeaponSystem {
 
   // sword swing
   private swordCd = 0;
-  private swordCrescents: { mesh: THREE.Mesh; t: number }[] = [];
+  private swordCrescents: { wrapper: THREE.Group; ring: THREE.Mesh; t: number }[] = [];
   private swordRoot: THREE.Group;
 
   /** Map of currently-equipped weapons (mutable). */
@@ -338,17 +338,33 @@ export class WeaponSystem {
       }
     });
 
-    // crescent ribbon VFX — flat ring sector aligned with player facing
+    // Crescent VFX. We want the visible sector to overlap the damage cone
+    // exactly. Damage is along the unit vector (sin facing, cos facing),
+    // i.e. world +Z when facing == 0.
+    //
+    // Using the ring's own intrinsic Euler rotations to compose "lay flat" +
+    // "face direction" gives the wrong axis on the second rotation, so the
+    // visible sector ended up 180° offset from the damage cone. Wrap the ring
+    // in a Group whose Y rotation IS the facing — clean separation, robust.
+    //
+    // Geometry: thetaStart = π/2 - halfAngle, thetaLength = 2*halfAngle puts
+    // the sector centred on +Y in 2D ring coordinates. ring.rotation.x = +π/2
+    // tilts the ring face-down so that +Y in geometry maps to +Z in the
+    // wrapper's local frame. Then wrapper.rotation.y = facing aligns the
+    // local +Z with the damage cone direction.
+    const wrapper = new THREE.Group();
+    wrapper.position.set(ox, 0.6, oz);
+    wrapper.rotation.y = player.facing;
+
     const geo = new THREE.RingGeometry(range * 0.7, range, 24, 1, Math.PI / 2 - halfAngle, halfAngle * 2);
     const mat = new THREE.MeshBasicMaterial({
       color: PALETTE.cyanGlow, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false,
     });
     const ring = new THREE.Mesh(geo, mat);
-    ring.rotation.x = -Math.PI / 2;          // lay flat on ground plane
-    ring.rotation.z = -player.facing;        // align sector with facing
-    ring.position.set(ox, 0.6, oz);
-    this.swordRoot.add(ring);
-    this.swordCrescents.push({ mesh: ring, t: 0 });
+    ring.rotation.x = Math.PI / 2;           // lay flat, sector → wrapper-local +Z
+    wrapper.add(ring);
+    this.swordRoot.add(wrapper);
+    this.swordCrescents.push({ wrapper, ring, t: 0 });
 
     this.audio.play('swordswing', 0.7);
     this.vfx.requestShake(0.04, 0.06);
@@ -359,11 +375,11 @@ export class WeaponSystem {
       const r = this.swordCrescents[i];
       r.t += dt;
       const k = Math.max(0, 1 - r.t / 0.14);
-      (r.mesh.material as THREE.MeshBasicMaterial).opacity = 0.6 * k;
+      (r.ring.material as THREE.MeshBasicMaterial).opacity = 0.6 * k;
       if (k <= 0) {
-        this.swordRoot.remove(r.mesh);
-        r.mesh.geometry.dispose();
-        (r.mesh.material as THREE.Material).dispose();
+        this.swordRoot.remove(r.wrapper);
+        r.ring.geometry.dispose();
+        (r.ring.material as THREE.Material).dispose();
         this.swordCrescents.splice(i, 1);
       }
     }
