@@ -58,6 +58,12 @@ export class TitleScreen {
   }
   show() { this.el.classList.remove('hidden'); }
   hide() { this.el.classList.add('hidden'); }
+  setPlayEnabled(enabled: boolean) {
+    const btn = this.el.querySelector('#play-btn') as HTMLButtonElement | null;
+    if (!btn) return;
+    btn.disabled = !enabled;
+    btn.textContent = enabled ? 'Pick a Volunteer' : 'Loading...';
+  }
 }
 
 export class PauseScreen {

@@ -55,6 +55,7 @@ import { TitleScreen, PauseScreen, GameOverScreen, VictoryScreen, LevelUpScreen,
 import type { GameState } from './game/types';
 import type { CharacterDef } from './game/characters';
 import { CHARACTERS } from './game/characters';
+import { assets } from './engine/assets';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const uiRoot = document.getElementById('ui-root') as HTMLDivElement;
@@ -151,6 +152,17 @@ let selectedCharacter: CharacterDef = CHARACTERS.knight;
 
 hud.hide();
 title.show();
+
+// Preload character GLBs while the title sits on screen. The Play button is
+// disabled until the six glTF files are in the AssetCache. On a fast machine
+// this resolves before the user reaches for the button.
+title.setPlayEnabled(false);
+assets.preloadAll().then(() => {
+  title.setPlayEnabled(true);
+}).catch(err => {
+  console.error('Asset preload failed', err);
+  uiRoot.innerHTML = `<div class="modal"><h1>Failed to load characters</h1><p>${(err as Error).message}</p></div>`;
+});
 
 function setState(next: GameState) {
   if (next === state) return;
