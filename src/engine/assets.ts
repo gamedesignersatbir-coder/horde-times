@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { MATERIAL_OVERRIDES } from './character-palette';
+import { MATERIAL_COLORS_LINEAR } from './character-palette';
 
 /**
  * Character GLB asset pipeline. Each character is a single .glb that bundles
@@ -52,42 +52,63 @@ export class AssetCache {
 
   // Independent skeleton clone per spawn. Materials are also cloned so the
   // existing per-instance hit-flash emissive patches (enemies.ts) don't leak
-  // across pool slots. Missing baseColor on the source GLBs (Blender shader-
-  // node setups don't survive glTF export) is patched here from the brand
-  // palette so the wooden-toy aesthetic reads correctly.
+  // across pool slots.
   //
-  // The whole scene is wrapped in an extra Group rotated 180° on Y. The GLBs
-  // are authored with their front along -Z, but the rest of the codebase
-  // assumes character forward is +Z (see player.ts atan2(moveX, moveZ)).
-  // Wrapping (rather than rotating the scene directly) keeps the character's
-  // own animation tracks untouched — the Death-anim's armature-level rotation
-  // still plays correctly.
+  // Three things happen at clone time:
+  //
+  //  1. Material colours from MATERIAL_COLORS_LINEAR are applied via
+  //     LinearSRGBColorSpace — Blender Color Ramp setups don't survive glTF
+  //     export, so most M_* materials arrive as plain white and we paint
+  //     them back from the linear-space colour table.
+  //  2. The cloned scene is wrapped in two groups:
+  //       outer (returned)   — facing pivot
+  //       └─ orient (rot=π)  — flips the GLB's authored -Z forward to +Z
+  //          └─ inner (offset) — translated so visual X/Z centre is at 0
+  //                              (some characters in the .blend are offset
+  //                              from the world origin; the export carries
+  //                              that into the GLB and would make the model
+  //                              orbit a fake pivot when the player turned)
+  //  3. Per-mesh shadow casting is enabled here too so we don't have to do
+  //     it again in the consumer.
   cloneFor(id: CharacterAssetId): { scene: THREE.Group; clips: THREE.AnimationClip[] } {
     const src = this.get(id);
     const inner = SkeletonUtils.clone(src.scene) as THREE.Group;
 
-    const overrides = MATERIAL_OVERRIDES[id];
     inner.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh || !mesh.material) return;
-      const cloneOne = (m: THREE.Material): THREE.Material => {
+      const paintOne = (m: THREE.Material): THREE.Material => {
         const c = m.clone();
         const std = c as THREE.MeshStandardMaterial;
-        if (std.isMeshStandardMaterial && overrides && std.name && overrides[std.name] !== undefined) {
-          std.color.setHex(overrides[std.name]);
+        if (std.isMeshStandardMaterial && std.name) {
+          const lin = MATERIAL_COLORS_LINEAR[std.name];
+          if (lin) std.color.setRGB(lin[0], lin[1], lin[2], THREE.LinearSRGBColorSpace);
         }
         return c;
       };
       mesh.material = Array.isArray(mesh.material)
-        ? mesh.material.map(cloneOne)
-        : cloneOne(mesh.material);
+        ? mesh.material.map(paintOne)
+        : paintOne(mesh.material);
       mesh.castShadow = true;
     });
 
-    // Wrapping group whose forward (+Z) lines up with the codebase convention.
+    // Centre the visual mesh on (0, _, 0). Compute the world-space bounding
+    // box of the cloned scene; offset the inner group by -centerX, -centerZ
+    // so rotation pivots through the visible centre. Y minimum is pinned to
+    // 0 (feet on ground).
+    const box = new THREE.Box3().setFromObject(inner);
+    const cx = (box.min.x + box.max.x) * 0.5;
+    const cz = (box.min.z + box.max.z) * 0.5;
+    inner.position.set(-cx, -box.min.y, -cz);
+
+    // Orient layer: rotate 180° on Y so the character's authored -Z forward
+    // becomes +Z, matching player.ts's atan2(moveX, moveZ) convention.
+    const orient = new THREE.Group();
+    orient.rotation.y = Math.PI;
+    orient.add(inner);
+
     const scene = new THREE.Group();
-    inner.rotation.y = Math.PI;
-    scene.add(inner);
+    scene.add(orient);
     return { scene, clips: src.clips };
   }
 }

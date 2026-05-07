@@ -1,100 +1,68 @@
 /**
  * Material colour overrides for the GLB characters.
  *
- * The Blender source uses shader-node setups that don't survive glTF export
- * (only baseColorFactor, normal, etc. round-trip — not procedural shader
- * graphs). Many of the materials in our six .glb files therefore have NO
- * baseColorFactor and load as plain white. This table fills the gap by
- * mapping material names to brand-aligned colours, applied at clone time.
+ * The Blender source stores its colours inside Color Ramp nodes feeding the
+ * Principled BSDF Base Color input. glTF export only round-trips the BSDF's
+ * own default value (the unlit grey 0.8) — Color Ramp graphs do not survive
+ * export. So every "main" material in our six .glb files arrives with NO
+ * baseColorFactor and renders as plain white.
  *
- * Colours intentionally echo the procedural-character palette (`src/style.ts`
- * + the original `characters.ts` + `enemies.ts`) so the GLB upgrade reads as
- * the same characters, not a different set.
+ * The colours here are the LIGHTER end of each Color Ramp in the .blend, in
+ * linear-Blender working space. We feed them to MeshStandardMaterial.color
+ * via setRGB(..., THREE.LinearSRGBColorSpace) at clone time so they display
+ * the same way Blender's viewport showed them.
  *
- * Materials NOT listed here keep whatever the GLB exported (e.g., the Gold,
- * GoldGlow, EyeRed, EmberHot variants do have explicit colours).
+ * Materials that already shipped a baseColorFactor (Gold, GoldGlow, Eye,
+ * EyeAmber, EyeCyan, EyeRed, Helmet, Visor, Cyan, CrystalGlow, Ember,
+ * EmberHot) are not overridden — the GLB carries them correctly.
+ *
+ * Source: extracted via headless Blender from
+ * `horde_times_exports/horde_times_assetssaveanim02.blend`.
  */
 
-import type { CharacterAssetId } from './assets';
+export type LinearRGB = readonly [number, number, number];
 
-type Hex = number;
+export const MATERIAL_COLORS_LINEAR: Record<string, LinearRGB> = {
+  // Knight (Sir Pommelry)
+  M_Tunic:        [0.10, 0.22, 0.55],
+  M_Legs:         [0.06, 0.13, 0.35],
+  M_Shield:       [0.85, 0.84, 0.78],
+  M_Belt:         [0.22, 0.12, 0.05],
+  M_DarkWood:     [0.18, 0.10, 0.06],
 
-const BROWN_LEATHER  = 0x4a2e15;
-const BROWN_WOOD     = 0x6b4318;
-const BROWN_WOOD_LT  = 0x8a5a2e;
-const SKIN           = 0xe6c9a0;
-const PALE_WOOD      = 0xd4c8a8;
-const CREAM          = 0xfff0d0;
-const BANDAGE        = 0xe8dfc8;
-const KNIGHT_BLUE    = 0x3b6dd1;
-const KNIGHT_BLUE_DK = 0x2a3b5c;
-const NAVY_DEEP      = 0x0c1322;
-const NAVY           = 0x1a2238;
-const NAVY_SHADOW    = 0x141a2c;
-const HUNTER_GREEN   = 0x3a5a2e;
-const HUNTER_TUNIC   = 0x6b4f2a;
-const HUNTER_PANTS   = 0x3a2515;
-const RUNNER_MOSS    = 0x88c34a;       // matches enemies.ts runner.color
-const RUNNER_MOSS_DK = 0x4a5a25;
-const BRUTE_BLOOD    = 0xc94f3a;       // matches enemies.ts brute.color
-const BRUTE_BLOOD_DK = 0x6a2818;
-const BOSS_PURPLE    = 0x3a2858;
-const BOSS_PURPLE_DK = 0x1f1430;
-const JOINT_DARK     = 0x2a1a14;
-const GRIMY_CLOTH    = 0x6a4a3a;
+  // Witch (Mistress Quill)
+  M_Robe:         [0.07, 0.10, 0.28],
+  M_RobeSkirt:    [0.05, 0.07, 0.20],
+  M_Hat:          [0.04, 0.04, 0.10],
+  M_Skin:         [0.62, 0.48, 0.34],
+  M_Wood:         [0.45, 0.28, 0.12],
 
-export const MATERIAL_OVERRIDES: Record<CharacterAssetId, Record<string, Hex>> = {
-  sir_pommelry: {
-    M_Tunic:    KNIGHT_BLUE,
-    M_DarkWood: BROWN_WOOD,
-    M_Shield:   0xc99844,              // goldDeep — heraldic shield
-    M_Belt:     BROWN_LEATHER,
-    M_Legs:     KNIGHT_BLUE_DK,
-  },
-  mistress_quill: {
-    M_Robe:      NAVY,
-    M_RobeSkirt: NAVY_SHADOW,
-    M_Hat:       NAVY_DEEP,
-    M_Skin:      SKIN,
-    M_Belt:      BROWN_LEATHER,
-    M_DarkWood:  BROWN_WOOD,
-    M_Wood:      BROWN_WOOD_LT,
-  },
-  margate_tossworthy: {
-    M_Cloak:        HUNTER_GREEN,
-    M_TunicHunter:  HUNTER_TUNIC,
-    M_PantsHunter:  HUNTER_PANTS,
-    M_Skin:         SKIN,
-    M_DarkWood:     BROWN_WOOD,
-    M_Wood:         BROWN_WOOD_LT,
-    M_Belt:         BROWN_LEATHER,
-    M_Strap:        BROWN_LEATHER,
-  },
-  runner: {
-    M_RunnerBody:  RUNNER_MOSS,
-    M_RunnerPale:  PALE_WOOD,
-    M_RunnerDark:  RUNNER_MOSS_DK,
-    M_JointDark:   JOINT_DARK,
-    M_Tooth:       CREAM,
-    M_ClothGrimy:  GRIMY_CLOTH,
-  },
-  brute: {
-    M_BruteBody:  BRUTE_BLOOD,
-    M_BrutePale:  PALE_WOOD,
-    M_BruteDark:  BRUTE_BLOOD_DK,
-    M_BruteWrap:  BANDAGE,
-    M_JointDark:  JOINT_DARK,
-    M_Tooth:      CREAM,
-    M_ClothGrimy: GRIMY_CLOTH,
-  },
-  boss: {
-    M_BossBody:   BOSS_PURPLE,
-    M_BossDark:   BOSS_PURPLE_DK,
-    M_BossPale:   PALE_WOOD,
-    M_BossPale2:  BANDAGE,
-    M_BossWrap:   BANDAGE,
-    M_JointDark:  JOINT_DARK,
-    M_Tooth:      CREAM,
-    M_ClothGrimy: GRIMY_CLOTH,
-  },
+  // Hunter (Margate Tossworthy)
+  M_Cloak:        [0.18, 0.20, 0.10],
+  M_TunicHunter:  [0.32, 0.22, 0.13],
+  M_PantsHunter:  [0.20, 0.13, 0.07],
+  M_Strap:        [0.14, 0.08, 0.04],
+
+  // Runner enemy
+  M_RunnerBody:   [0.16, 0.20, 0.10],
+  M_RunnerDark:   [0.10, 0.12, 0.05],
+  M_RunnerPale:   [0.55, 0.42, 0.27],
+
+  // Brute enemy
+  M_BruteBody:    [0.32, 0.10, 0.07],
+  M_BruteDark:    [0.16, 0.06, 0.04],
+  M_BrutePale:    [0.55, 0.42, 0.27],
+  M_BruteWrap:    [0.30, 0.20, 0.10],
+
+  // Boss enemy
+  M_BossBody:     [0.22, 0.10, 0.20],
+  M_BossDark:     [0.10, 0.04, 0.09],
+  M_BossPale:     [0.55, 0.42, 0.27],
+  M_BossPale2:    [0.60, 0.50, 0.35],
+  M_BossWrap:     [0.30, 0.20, 0.10],
+
+  // Shared across enemies
+  M_JointDark:    [0.08, 0.08, 0.06],
+  M_Tooth:        [0.85, 0.78, 0.55],
+  M_ClothGrimy:   [0.22, 0.16, 0.08],
 };
