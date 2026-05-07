@@ -1,15 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { AnimatedCharacter } from './animated-character';
 
-// Mock GLB-shaped object: a group with two named clips. Single-track is
-// enough — the mixer just needs SOMETHING to play.
-function makeMockAsset() {
+function makeMockAsset(extras: string[] = []) {
   const scene = new THREE.Group();
   const track = new THREE.NumberKeyframeTrack('.scale[x]', [0, 1], [1, 1]);
-  const idle = new THREE.AnimationClip('Idle', 1, [track]);
-  const run = new THREE.AnimationClip('Run', 1, [track]);
-  return { scene, clips: [idle, run] };
+  const clips = [
+    new THREE.AnimationClip('Idle', 1, [track]),
+    new THREE.AnimationClip('Run', 1, [track]),
+  ];
+  if (extras.includes('Attack')) clips.push(new THREE.AnimationClip('Attack', 22 / 24, [track]));
+  if (extras.includes('Hit'))    clips.push(new THREE.AnimationClip('Hit', 14 / 24, [track]));
+  if (extras.includes('Death'))  clips.push(new THREE.AnimationClip('Death', 30 / 24, [track]));
+  return { scene, clips };
 }
 
 describe('AnimatedCharacter — locomotion', () => {
@@ -28,6 +31,42 @@ describe('AnimatedCharacter — locomotion', () => {
     const ac = new AnimatedCharacter(makeMockAsset());
     ac.setMoving(true);
     ac.setMoving(false);
+    expect(ac.currentState()).toBe('idle');
+  });
+});
+
+describe('AnimatedCharacter — combat', () => {
+  it('fires onStrike exactly once after the strike-frame elapses', () => {
+    const ac = new AnimatedCharacter(makeMockAsset(['Attack', 'Hit', 'Death']),
+      { strikeFrame: 12, attackTotalFrames: 22 });
+    const onStrike = vi.fn();
+    ac.playAttack(onStrike);
+    ac.update(0.4); expect(onStrike).not.toHaveBeenCalled();
+    ac.update(0.2); expect(onStrike).toHaveBeenCalledTimes(1);
+    ac.update(1.0); expect(onStrike).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires onStrike immediately if no Attack clip is bound', () => {
+    const ac = new AnimatedCharacter(makeMockAsset()); // no Attack clip
+    const onStrike = vi.fn();
+    ac.playAttack(onStrike);
+    expect(onStrike).toHaveBeenCalledTimes(1);
+  });
+
+  it('Death state is terminal — playAttack/setMoving become no-ops', () => {
+    const ac = new AnimatedCharacter(makeMockAsset(['Attack', 'Hit', 'Death']),
+      { strikeFrame: 12, attackTotalFrames: 22 });
+    ac.playDeath(() => {});
+    ac.setMoving(true);
+    ac.playAttack(() => {});
+    expect(ac.currentState()).toBe('death');
+  });
+
+  it('reset() returns to Idle and clears state', () => {
+    const ac = new AnimatedCharacter(makeMockAsset(['Attack', 'Hit', 'Death']),
+      { strikeFrame: 12, attackTotalFrames: 22 });
+    ac.playDeath(() => {});
+    ac.reset();
     expect(ac.currentState()).toBe('idle');
   });
 });

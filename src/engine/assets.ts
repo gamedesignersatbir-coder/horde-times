@@ -83,6 +83,17 @@ export class AssetCache {
         if (std.isMeshStandardMaterial && std.name) {
           const lin = MATERIAL_COLORS_LINEAR[std.name];
           if (lin) std.color.setRGB(lin[0], lin[1], lin[2], THREE.LinearSRGBColorSpace);
+          // Eyes are modelled coplanar with the visor / face plate; small
+          // depth-precision wobble at typical camera distances makes them
+          // appear to "blink" as the camera moves. Polygon-offset pushes
+          // the eye fragments slightly toward the camera so the visor is
+          // unambiguously behind them at every angle.
+          if (std.name === 'M_Eye' || std.name === 'M_EyeAmber'
+            || std.name === 'M_EyeCyan' || std.name === 'M_EyeRed') {
+            std.polygonOffset = true;
+            std.polygonOffsetFactor = -2;
+            std.polygonOffsetUnits = -2;
+          }
         }
         return c;
       };

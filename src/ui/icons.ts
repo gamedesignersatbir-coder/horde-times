@@ -94,6 +94,14 @@ export const ICONS = {
     <path d="M8 38 L14 36" stroke-opacity="0.55"/>
     <path d="M40 38 L34 36" stroke-opacity="0.55"/>
   </svg>`,
+
+  // Sword swing — sword with crescent arc
+  swordswing: `${SVG_OPEN}
+    <path d="M10 38 L34 14" stroke-width="3"/>
+    <path d="M32 12 L36 8 L40 12 L36 16 Z" fill="currentColor" fill-opacity="0.4"/>
+    <path d="M8 40 L14 38 L10 36 Z" fill="currentColor"/>
+    <path d="M14 18 Q 28 10, 42 24" stroke-opacity="0.5" stroke-dasharray="2 2"/>
+  </svg>`,
 } as const;
 
 export type IconKey = keyof typeof ICONS;

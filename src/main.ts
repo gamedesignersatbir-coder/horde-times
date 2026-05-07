@@ -178,17 +178,7 @@ function setState(next: GameState) {
   if (next === 'select') {
     hud.hide();
     music.stop();
-    characterSelect.show((c) => {
-      // Temporary scaffolding gate: until Phase D converts Witch and Hunter
-      // to GLB-backed defs, only assetId-equipped heroes can spawn. Removed
-      // in Phase D.
-      if (!c.assetId) {
-        console.warn(`${c.name} not yet GLB-backed — falling back to Knight.`);
-        c = CHARACTERS.knight;
-      }
-      selectedCharacter = c;
-      startRun();
-    });
+    characterSelect.show((c) => { selectedCharacter = c; startRun(); });
   }
   if (next === 'paused') pauseScreen.show();
   if (next === 'gameover') { gameOverScreen.show(runTime, xp.level); music.stop(); }

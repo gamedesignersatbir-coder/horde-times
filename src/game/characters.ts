@@ -309,7 +309,7 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
     name: 'Sir Pommelry',
     title: 'Knight, Probationary',
     blurb: 'Inherited a sword and a chronic sense of duty from an aunt. Has been meaning to put both down for some years now. Stands in the middle of trouble and lets it spin past him, which is, technically, a kind of strategy.',
-    startingWeapon: 'blades',  // becomes 'swordswing' in Phase C
+    startingWeapon: 'swordswing',
     stats: { maxHp: 130, moveSpeed: 5.4, magnetRadius: 2.0, damageMult: 1.0, cooldownMult: 1.0 },
     assetId: 'sir_pommelry',
     attackStrikeFrame: 12,
@@ -323,7 +323,10 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
     blurb: "Failed her wizard's exam on a technicality (gender), opened her own practice the following Tuesday. Business cards read: 'Lightning to Order, Reasonable Rates, No Refunds on Account of Weather.'",
     startingWeapon: 'lightning',
     stats: { maxHp: 90, moveSpeed: 6.2, magnetRadius: 2.6, damageMult: 1.25, cooldownMult: 0.92 },
-    build: buildSorceress,
+    assetId: 'mistress_quill',
+    attackStrikeFrame: 12,
+    attackTotalFrames: 24,
+    height: 1.78,
   },
   hunter: {
     id: 'hunter',
@@ -332,7 +335,10 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
     blurb: "Fully paid-up member of the Boomerang Throwers' Guild (motto: 'They Come Back. They Always Come Back.'). Has lost three crossbows, two umbrellas, and one quite reasonable hat. Has never lost a boomerang.",
     startingWeapon: 'boomerang',
     stats: { maxHp: 110, moveSpeed: 5.8, magnetRadius: 2.4, damageMult: 1.1, cooldownMult: 0.95 },
-    build: buildHunter,
+    assetId: 'margate_tossworthy',
+    attackStrikeFrame: 12,
+    attackTotalFrames: 20,
+    height: 1.34,
   },
 };
 

@@ -16,6 +16,14 @@ export function rollUpgradeOptions(player: Player, weapons: WeaponSystem, count 
   const pool: UpgradeOption[] = [];
 
   // weapon unlocks
+  if (!weapons.has('blades')) {
+    pool.push({
+      id: 'unlock-blades', name: WEAPON_DEFS.blades.name, tag: 'New Acquaintance',
+      icon: ICONS.blades,
+      desc: 'Knives that orbit you and decline to hold a grudge against gravity.',
+      apply: () => weapons.add('blades'),
+    });
+  }
   if (!weapons.has('pistol')) {
     pool.push({
       id: 'unlock-pistol', name: WEAPON_DEFS.pistol.name, tag: 'New Acquaintance',
@@ -48,9 +56,12 @@ export function rollUpgradeOptions(player: Player, weapons: WeaponSystem, count 
       apply: () => weapons.add('boomerang'),
     });
   }
+  // swordswing is NOT in the unlock pool — it is a per-character starter
+  // (Sir Pommelry only). Other heroes never see it offered as a "New
+  // Acquaintance".
 
   // weapon upgrades (only if owned and below max)
-  for (const k of ['blades', 'pistol', 'shockwave', 'lightning', 'boomerang'] as const) {
+  for (const k of ['blades', 'pistol', 'shockwave', 'lightning', 'boomerang', 'swordswing'] as const) {
     if (weapons.has(k)) {
       const lvl = weapons.level(k);
       const def = WEAPON_DEFS[k];

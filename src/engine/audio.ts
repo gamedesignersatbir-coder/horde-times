@@ -97,6 +97,9 @@ export class Audio {
     this.register('boss', tone({ freq: 60, freqEnd: 30, duration: 1.4, type: 'sawtooth' as any, decay: 0.9, volume: 0.7 }));
     this.register('victory', tone({ freq: 523, freqEnd: 1046, duration: 1.5, type: 'sine', decay: 1.0, volume: 0.6 }));
     this.register('gameOver', tone({ freq: 220, freqEnd: 55, duration: 1.4, type: 'triangle', decay: 1.0, volume: 0.55 }));
+    // Sword swing: short whoosh (noise sweep) layered with a metallic
+    // ring (high triangle decaying fast) — close enough in 22kHz mono.
+    this.register('swordswing', tone({ freq: 1800, freqEnd: 600, duration: 0.18, type: 'noise', decay: 0.14, volume: 0.4 }));
   }
 
   private register(key: string, src: string) {

@@ -37,7 +37,10 @@ export class Player {
       throw new Error(`Character ${character.id} has no assetId — GLB conversion incomplete.`);
     }
     const cloned = assets.cloneFor(character.assetId);
-    this.char = new AnimatedCharacter(cloned);
+    this.char = new AnimatedCharacter(cloned, {
+      strikeFrame: character.attackStrikeFrame ?? 12,
+      attackTotalFrames: character.attackTotalFrames ?? 22,
+    });
     this.mesh = this.char.group;
     this.position = this.mesh.position;
     this.position.set(0, 0, 0);
@@ -58,6 +61,12 @@ export class Player {
     this.mesh.add(torch.group);
   }
 
+  /** Used by weapons that fire on the character's swing — knight sword, witch
+   *  staff, hunter boomerang. The weapon's own logic runs inside onStrike. */
+  playAttack(onStrike: () => void) {
+    this.char.playAttack(onStrike);
+  }
+
   takeDamage(amount: number, time: number): boolean {
     if (!this.alive) return false;
     if (time < this.iframeUntil) return false;
@@ -67,8 +76,10 @@ export class Player {
     if (this.stats.hp <= 0) {
       this.stats.hp = 0;
       this.alive = false;
+      this.char.playDeath(() => { /* main.ts state machine handles GameOver */ });
       return true;
     }
+    this.char.playHit();
     return false;
   }
 

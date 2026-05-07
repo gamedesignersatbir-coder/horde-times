@@ -36,7 +36,32 @@ export const WEAPON_DEFS: Record<WeaponKind, WeaponDef> = {
     kind: 'boomerang', name: 'The Triangle of Returning', icon: ICONS.boomerang, maxLevel: 5,
     desc: (l) => `Every ${(1.6 - (l - 1) * 0.15).toFixed(2)}s. ${(16 + (l - 1) * 5)} dmg. Goes out, comes back. Cuts everything in between. The Guild are very firm on this.`,
   },
+  swordswing: {
+    kind: 'swordswing', name: "Sir Pommelry's Sword", icon: ICONS.swordswing, maxLevel: 5,
+    desc: (l) => `A wide arc of unenthusiastic violence. ${(18 + (l - 1) * 5)} dmg, ${(2.5 + (l - 1) * 0.2).toFixed(1)}m reach. Performed under protest.`,
+  },
 };
+
+/**
+ * Cone-arc detection: is the point (x,z) inside a sector of half-angle
+ * halfAngleRad and length range, anchored at (ox,oz) and pointing in the
+ * direction `facing` (atan2(moveX, moveZ) convention — character forward
+ * is +Z when facing == 0, so the unit vector is (sin facing, cos facing)).
+ */
+export function isInsideArc(
+  origin: { ox: number; oz: number; facing: number; range: number; halfAngleRad: number },
+  pt: { x: number; z: number },
+): boolean {
+  const dx = pt.x - origin.ox;
+  const dz = pt.z - origin.oz;
+  const dist2 = dx * dx + dz * dz;
+  if (dist2 > origin.range * origin.range || dist2 < 1e-6) return false;
+  const fx = Math.sin(origin.facing);
+  const fz = Math.cos(origin.facing);
+  const d = Math.sqrt(dist2);
+  const cosAngle = (dx * fx + dz * fz) / d;
+  return cosAngle >= Math.cos(origin.halfAngleRad);
+}
 
 interface Projectile {
   active: boolean;
@@ -80,6 +105,11 @@ export class WeaponSystem {
   }[] = [];
   private boomerRoot: THREE.Group;
 
+  // sword swing
+  private swordCd = 0;
+  private swordCrescents: { mesh: THREE.Mesh; t: number }[] = [];
+  private swordRoot: THREE.Group;
+
   /** Map of currently-equipped weapons (mutable). */
   public equipped: Map<WeaponKind, WeaponState> = new Map();
 
@@ -94,6 +124,8 @@ export class WeaponSystem {
     scene.add(this.lightningRoot);
     this.boomerRoot = new THREE.Group();
     scene.add(this.boomerRoot);
+    this.swordRoot = new THREE.Group();
+    scene.add(this.swordRoot);
   }
 
   add(kind: WeaponKind) {
@@ -207,17 +239,23 @@ export class WeaponSystem {
     }
 
     // ---------- Chain Lightning ----------
+    // Cooldown is floored at the witch's Attack-clip duration (24f / 24fps =
+    // 1.0s) so the visible staff thrust always plays in full. The bolt
+    // spawns at the strike-frame, lining the sparks up with the thrust.
     if (this.equipped.has('lightning')) {
       const lvl = this.level('lightning');
       const baseCd = (1.4 - (lvl - 1) * 0.12) * cdMult;
+      const cd = Math.max(baseCd, 24 / 24);
       this.lightningCd -= dt;
       if (this.lightningCd <= 0) {
         const target = enemies.findNearest(player.position, 16);
         if (target) {
-          this.lightningCd = baseCd;
+          this.lightningCd = cd;
           const dmg = (18 + (lvl - 1) * 5) * dmgMult;
           const chains = 1 + lvl;
-          this.fireLightning(player.position, target, dmg, chains, time, enemies);
+          player.playAttack(() => {
+            this.fireLightning(player.position, target, dmg, chains, time, enemies);
+          });
         } else {
           this.lightningCd = 0.2;
         }
@@ -225,12 +263,15 @@ export class WeaponSystem {
     }
 
     // ---------- Boomerang ----------
+    // Cooldown floored at the hunter's Attack-clip duration (20f / 24fps).
+    // The boomerang launches at strike-frame so the throw matches the spawn.
     if (this.equipped.has('boomerang')) {
       const lvl = this.level('boomerang');
       const baseCd = (1.6 - (lvl - 1) * 0.15) * cdMult;
+      const cd = Math.max(baseCd, 20 / 24);
       this.boomerCd -= dt;
       if (this.boomerCd <= 0) {
-        this.boomerCd = baseCd;
+        this.boomerCd = cd;
         const dmg = (16 + (lvl - 1) * 5) * dmgMult;
         const range = 10 + lvl;
         // throw in player's facing direction; if standing still, throw at nearest enemy
@@ -245,16 +286,87 @@ export class WeaponSystem {
             dirX = dx / len; dirZ = dz / len;
           }
         }
-        this.throwBoomerang(player.position, dirX, dirZ, dmg, range, time);
-        this.audio.play('shoot', 0.7);
+        player.playAttack(() => {
+          this.throwBoomerang(player.position, dirX, dirZ, dmg, range, time);
+          this.audio.play('shoot', 0.7);
+        });
       }
     }
 
-    // ---------- update projectiles + arcs + boomerangs + rings ----------
+    // ---------- Sword Swing (knight starter) ----------
+    // Cooldown floored at the knight's Attack-clip duration (22f / 24fps).
+    // Damage lands at strike-frame, so the cone arcs out as the sword reaches
+    // its mid-swing apex.
+    if (this.equipped.has('swordswing')) {
+      const lvl = this.level('swordswing');
+      const baseCd = 1.0 * cdMult;
+      const cd = Math.max(baseCd, 22 / 24);
+      this.swordCd -= dt;
+      if (this.swordCd <= 0) {
+        this.swordCd = cd;
+        const dmg = (18 + (lvl - 1) * 5) * dmgMult;
+        const range = 2.5 + (lvl - 1) * 0.2;
+        const halfAngle = Math.PI / 3;        // 120° cone
+        player.playAttack(() => {
+          this.fireSwordSwing(player, enemies, dmg, range, halfAngle, time);
+        });
+      }
+    }
+
+    // ---------- update projectiles + arcs + boomerangs + rings + swings ----------
     this.updateProjectiles(dt, time, enemies);
     this.updateShockRings(dt);
     this.updateLightning(dt);
     this.updateBoomerangs(dt, time, player, enemies);
+    this.updateSwordCrescents(dt);
+  }
+
+  private fireSwordSwing(
+    player: Player, enemies: EnemyManager,
+    dmg: number, range: number, halfAngle: number, time: number,
+  ) {
+    const ox = player.position.x, oz = player.position.z;
+    enemies.forEach((e, mesh, type) => {
+      if (isInsideArc(
+        { ox, oz, facing: player.facing, range, halfAngleRad: halfAngle },
+        { x: e.pos.x, z: e.pos.z },
+      )) {
+        const dx = e.pos.x - ox, dz = e.pos.z - oz;
+        const d = Math.hypot(dx, dz) || 0.0001;
+        const knockDir = new THREE.Vector3(dx / d, 0, dz / d);
+        enemies.damageEnemy(e, mesh, type, dmg, 'swordswing', time, knockDir, 6);
+      }
+    });
+
+    // crescent ribbon VFX — flat ring sector aligned with player facing
+    const geo = new THREE.RingGeometry(range * 0.7, range, 24, 1, Math.PI / 2 - halfAngle, halfAngle * 2);
+    const mat = new THREE.MeshBasicMaterial({
+      color: PALETTE.cyanGlow, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false,
+    });
+    const ring = new THREE.Mesh(geo, mat);
+    ring.rotation.x = -Math.PI / 2;          // lay flat on ground plane
+    ring.rotation.z = -player.facing;        // align sector with facing
+    ring.position.set(ox, 0.6, oz);
+    this.swordRoot.add(ring);
+    this.swordCrescents.push({ mesh: ring, t: 0 });
+
+    this.audio.play('swordswing', 0.7);
+    this.vfx.requestShake(0.04, 0.06);
+  }
+
+  private updateSwordCrescents(dt: number) {
+    for (let i = this.swordCrescents.length - 1; i >= 0; i--) {
+      const r = this.swordCrescents[i];
+      r.t += dt;
+      const k = Math.max(0, 1 - r.t / 0.14);
+      (r.mesh.material as THREE.MeshBasicMaterial).opacity = 0.6 * k;
+      if (k <= 0) {
+        this.swordRoot.remove(r.mesh);
+        r.mesh.geometry.dispose();
+        (r.mesh.material as THREE.Material).dispose();
+        this.swordCrescents.splice(i, 1);
+      }
+    }
   }
 
   // ---------- Chain Lightning ----------

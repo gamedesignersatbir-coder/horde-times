@@ -13,7 +13,7 @@ export interface PlayerStats {
   cooldownMult: number; // 1.0 = base, 0.5 = 50% reduced
 }
 
-export type WeaponKind = 'blades' | 'pistol' | 'shockwave' | 'lightning' | 'boomerang';
+export type WeaponKind = 'blades' | 'pistol' | 'shockwave' | 'lightning' | 'boomerang' | 'swordswing';
 
 export interface WeaponState {
   kind: WeaponKind;
