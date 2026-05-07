@@ -13,8 +13,12 @@ export class CameraRig {
 
   // chase offset (behind, above) — angled for a cinematic third-person view that
   // still shows what's coming at you. Lower angle = more horizon visible.
+  // lookOffset.y was 1.4 (chest of the procedural ~1.85m characters) — lowered
+  // to 0.9 to track the centre-mass of the new GLB characters, which range
+  // from 0.95m (runner) to 1.78m (witch). Centre-mass at ~0.9 frames all of
+  // them better than chest-of-tallest.
   private readonly offset = new THREE.Vector3(0, 8, 14);
-  private readonly lookOffset = new THREE.Vector3(0, 1.4, -3);
+  private readonly lookOffset = new THREE.Vector3(0, 0.9, -3);
   private readonly followLerp = 6.5;
   private readonly lookLerp = 7.5;
 

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { MATERIAL_OVERRIDES } from './character-palette';
 
 /**
  * Character GLB asset pipeline. Each character is a single .glb that bundles
@@ -51,21 +52,42 @@ export class AssetCache {
 
   // Independent skeleton clone per spawn. Materials are also cloned so the
   // existing per-instance hit-flash emissive patches (enemies.ts) don't leak
-  // across pool slots.
+  // across pool slots. Missing baseColor on the source GLBs (Blender shader-
+  // node setups don't survive glTF export) is patched here from the brand
+  // palette so the wooden-toy aesthetic reads correctly.
+  //
+  // The whole scene is wrapped in an extra Group rotated 180° on Y. The GLBs
+  // are authored with their front along -Z, but the rest of the codebase
+  // assumes character forward is +Z (see player.ts atan2(moveX, moveZ)).
+  // Wrapping (rather than rotating the scene directly) keeps the character's
+  // own animation tracks untouched — the Death-anim's armature-level rotation
+  // still plays correctly.
   cloneFor(id: CharacterAssetId): { scene: THREE.Group; clips: THREE.AnimationClip[] } {
     const src = this.get(id);
-    const scene = SkeletonUtils.clone(src.scene) as THREE.Group;
-    scene.traverse((o) => {
+    const inner = SkeletonUtils.clone(src.scene) as THREE.Group;
+
+    const overrides = MATERIAL_OVERRIDES[id];
+    inner.traverse((o) => {
       const mesh = o as THREE.Mesh;
-      if (mesh.isMesh && mesh.material) {
-        if (Array.isArray(mesh.material)) {
-          mesh.material = mesh.material.map(m => m.clone());
-        } else {
-          mesh.material = mesh.material.clone();
+      if (!mesh.isMesh || !mesh.material) return;
+      const cloneOne = (m: THREE.Material): THREE.Material => {
+        const c = m.clone();
+        const std = c as THREE.MeshStandardMaterial;
+        if (std.isMeshStandardMaterial && overrides && std.name && overrides[std.name] !== undefined) {
+          std.color.setHex(overrides[std.name]);
         }
-        mesh.castShadow = true;
-      }
+        return c;
+      };
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map(cloneOne)
+        : cloneOne(mesh.material);
+      mesh.castShadow = true;
     });
+
+    // Wrapping group whose forward (+Z) lines up with the codebase convention.
+    const scene = new THREE.Group();
+    inner.rotation.y = Math.PI;
+    scene.add(inner);
     return { scene, clips: src.clips };
   }
 }
